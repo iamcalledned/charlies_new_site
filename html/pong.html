@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atari 2600 Pong</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        #pongCanvas {
+            border: 2px solid #ddd;
+            background-color: #000;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="pongCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let leftPaddle, rightPaddle, ball, scoreLeft, scoreRight;
+        let pongGameRunning = false;
+        let animationFrameId;
+
+        function initializePong() {
+            pongGameRunning = true;
+            leftPaddle = { x: 30, y: canvas.height / 2 - 50, width: 10, height: 100, color: '#fff' };
+            rightPaddle = { x: canvas.width - 30, y: canvas.height / 2 - 50, width: 10, height: 100, color: '#fff' };
+            ball = { x: canvas.width / 2, y: canvas.height / 2, radius: 10, speedX: 5, speedY: 5, color: '#ffdb58' };
+            scoreLeft = 0;
+            scoreRight = 0;
+            pongLoop();
+        }
+
+        function drawPong() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw paddles
+            ctx.fillStyle = leftPaddle.color;
+            ctx.fillRect(leftPaddle.x, leftPaddle.y, leftPaddle.width, leftPaddle.height);
+            ctx.fillStyle = rightPaddle.color;
+            ctx.fillRect(rightPaddle.x, rightPaddle.y, rightPaddle.width, rightPaddle.height);
+
+            // Draw ball
+            ctx.fillStyle = ball.color;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw scores
+            ctx.font = '1rem "Press Start 2P", cursive';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`Score: ${scoreLeft}`, 100, 30);
+            ctx.fillText(`Score: ${scoreRight}`, canvas.width - 200, 30);
+        }
+
+        function updatePong() {
+            // Move ball
+            ball.x += ball.speedX;
+            ball.y += ball.speedY;
+
+            // Wall collision
+            if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+                ball.speedY *= -1;
+            }
+
+            // Paddle collision
+            if (ball.x - ball.radius < leftPaddle.x + leftPaddle.width &&
+                ball.y > leftPaddle.y && ball.y < leftPaddle.y + leftPaddle.height) {
+                ball.speedX *= -1;
+                ball.speedX += 1; // Increase speed
+            } else if (ball.x + ball.radius > rightPaddle.x &&
+                       ball.y > rightPaddle.y && ball.y < rightPaddle.y + rightPaddle.height) {
+                ball.speedX *= -1;
+                ball.speedX -= 1;
+            }
+
+            // Score
+            if (ball.x - ball.radius < 0) {
+                scoreRight++;
+                ball.x = canvas.width / 2;
+                ball.y = canvas.height / 2;
+                ball.speedX = 5;
+                ball.speedY = 5;
+            } else if (ball.x + ball.radius > canvas.width) {
+                scoreLeft++;
+                ball.x = canvas.width / 2;
+                ball.y = canvas.height / 2;
+                ball.speedX = -5;
+                ball.speedY = -5;
+            }
+
+            // Move paddles (AI for right paddle)
+            if (ball.y < rightPaddle.y + rightPaddle.height / 2) {
+                rightPaddle.y -= 5;
+            } else if (ball.y > rightPaddle.y + rightPaddle.height / 2) {
+                rightPaddle.y += 5;
+            }
+            if (rightPaddle.y < 0) rightPaddle.y = 0;
+            if (rightPaddle.y > canvas.height - rightPaddle.height) rightPaddle.y = canvas.height - rightPaddle.height;
+
+            // Player control for left paddle
+            if (keys['ArrowUp'] && leftPaddle.y > 0) {
+                leftPaddle.y -= 7;
+            }
+            if (keys['ArrowDown'] && leftPaddle.y < canvas.height - leftPaddle.height) {
+                leftPaddle.y += 7;
+            }
+        }
+
+        function pongLoop() {
+            if (!pongGameRunning) return;
+            drawPong();
+            updatePong();
+            animationFrameId = requestAnimationFrame(pongLoop);
+        }
+
+        let keys = {};
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        window.addEventListener('load', () => {
+            initializePong();
+        });
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth * 0.8;
+            canvas.height = window.innerHeight * 0.6;
+        });
+    </script>
+</body>
+</html>
