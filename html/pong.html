@@ -16,112 +16,34 @@
             background-color: #000;
             font-family: 'Press Start 2P', cursive;
         }
+
         #pongCanvas {
             border: 2px solid #ddd;
             background-color: #000;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-            display: none;
-        }
-        #gameStartScreen {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            color: #fff;
-            padding: 2rem;
-            border-radius: 1rem;
-            text-align: center;
-            z-index: 10;
-        }
-        #gameStartScreen h1 {
-            font-size: 2rem;
-            margin-bottom: 1rem;
-            color: #ffdb58;
-        }
-        #gameStartScreen p {
-            font-size: 0.8rem;
-            margin-bottom: 1.5rem;
-        }
-        #startButton {
-            padding: 0.75rem 1.5rem;
-            font-size: 1rem;
-            background-color: #4CAF50;
-            color: #fff;
-            border: none;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-            font-family: 'Press Start 2P', cursive;
-        }
-        #startButton:hover {
-            background-color: #367c39;
-        }
-        .instructions-box {
-            position: absolute;
-            bottom: 1rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            color: #fff;
-            padding: 0.5rem;
-            border-radius: 0.375rem;
-            font-size: 0.7rem;
-            z-index: 10;
-            text-align: center;
-            border: 1px solid #ddd;
-        }
-        .instructions-box p {
-            margin-bottom: 0.25rem;
-        }
-        .instructions-box kbd {
-            padding: 0.25rem;
-            background-color: #333;
-            color: #eee;
-            border-radius: 0.125rem;
-            border: 1px solid #555;
-            font-size: 0.6rem;
         }
     </style>
 </head>
 <body>
-    <div id="gameStartScreen">
-        <h1>Atari 2600 Pong</h1>
-        <p>Use the arrow keys to control your paddle.</p>
-        <button id="startButton">Start Game</button>
-    </div>
-    <canvas id="pongCanvas" width="800" height="600" style="display: none;"></canvas>
-    <div class="instructions-box">
-        <p>Player 1 Controls:</p>
-        <p><kbd>↑</kbd> Move Up | <kbd>↓</kbd> Move Down</p>
-    </div>
-
+    <canvas id="pongCanvas" width="800" height="600"></canvas>
     <script>
         const canvas = document.getElementById('pongCanvas');
         const ctx = canvas.getContext('2d');
-        const startScreen = document.getElementById('gameStartScreen');
-        const startButton = document.getElementById('startButton');
 
         let leftPaddle, rightPaddle, ball, scoreLeft, scoreRight;
         let pongGameRunning = false;
         let animationFrameId;
 
         function initializePong() {
-            // No initialization here, only show canvas and set running flag
-            startScreen.style.display = 'none';
-            pongCanvas.style.display = 'block';
             pongGameRunning = true;
             leftPaddle = { x: 30, y: canvas.height / 2 - 50, width: 10, height: 100, color: '#fff' };
             rightPaddle = { x: canvas.width - 30, y: canvas.height / 2 - 50, width: 10, height: 100, color: '#fff' };
-            ball = { x: canvas.width / 2, y: canvas.height / 2, radius: 10,  color: '#ffdb58' };
+            ball = { x: canvas.width / 2, y: canvas.height / 2, radius: 10, speedX: 5, speedY: 5, color: '#ffdb58' };
             scoreLeft = 0;
             scoreRight = 0;
-            // Start the game loop.
-            pongLoop();  // Call pongLoop to start the animation
+            pongLoop();
         }
-
-
 
         function drawPong() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -146,8 +68,6 @@
         }
 
         function updatePong() {
-            if (!pongGameRunning) return;
-
             // Move ball
             ball.x += ball.speedX;
             ball.y += ball.speedY;
@@ -216,13 +136,8 @@
             keys[e.key] = false;
         });
 
-        startButton.addEventListener('click', () => {
-            if (!pongGameRunning) {
-                // Set initial ball speed and direction here, before starting the loop
-                ball.speedX = 5;
-                ball.speedY = 5;
-                initializePong(); //this function now শুধু starts
-            }
+        window.addEventListener('load', () => {
+            initializePong();
         });
 
         window.addEventListener('resize', () => {
