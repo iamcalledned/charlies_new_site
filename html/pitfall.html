@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pitfall Adventure</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        #pitfallCanvas {
+            border: 2px solid #ddd;
+            background-color: #000;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <canvas id="pitfallCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('pitfallCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let player, obstacles, treasures, score, gameRunning, animationFrameId;
+
+        function initializePitfall() {
+            player = { x: 50, y: canvas.height - 70, width: 30, height: 50, color: '#00FF00', speed: 5, jumping: false, velocityY: 0 };
+            obstacles = [{ x: 300, y: canvas.height - 50, width: 50, height: 50, color: '#8B4513' }];
+            treasures = [{ x: 600, y: canvas.height - 50, width: 30, height: 30, color: '#FFD700' }];
+            score = 0;
+            gameRunning = true;
+            gameLoop();
+        }
+
+        function drawPitfall() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw player
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Draw obstacles
+            for (let obstacle of obstacles) {
+                ctx.fillStyle = obstacle.color;
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            }
+
+            // Draw treasures
+            for (let treasure of treasures) {
+                ctx.fillStyle = treasure.color;
+                ctx.fillRect(treasure.x, treasure.y, treasure.width, treasure.height);
+            }
+
+            // Draw score
+            ctx.font = '1rem "Press Start 2P", cursive';
+            ctx.fillStyle = '#fff';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+        }
+
+        function updatePitfall() {
+            // Gravity
+            if (player.jumping) {
+                player.velocityY += 0.5;
+                player.y += player.velocityY;
+                if (player.y >= canvas.height - player.height - 20) {
+                    player.jumping = false;
+                    player.y = canvas.height - player.height - 20;
+                }
+            }
+
+            // Move obstacles
+            for (let obstacle of obstacles) {
+                obstacle.x -= 3;
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacle.x = canvas.width + Math.random() * 200;
+                }
+            }
+
+            // Check collisions
+            for (let obstacle of obstacles) {
+                if (checkCollision(player, obstacle)) {
+                    endGame();
+                }
+            }
+
+            // Collect treasures
+            for (let i = treasures.length - 1; i >= 0; i--) {
+                if (checkCollision(player, treasures[i])) {
+                    treasures.splice(i, 1);
+                    score += 10;
+                }
+            }
+        }
+
+        function checkCollision(obj1, obj2) {
+            return obj1.x < obj2.x + obj2.width &&
+                   obj1.x + obj1.width > obj2.x &&
+                   obj1.y < obj2.y + obj2.height &&
+                   obj1.y + obj1.height > obj2.y;
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+            drawPitfall();
+            updatePitfall();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            alert('Game Over! Your score: ' + score);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' && !player.jumping) {
+                player.jumping = true;
+                player.velocityY = -10;
+            }
+        });
+
+        window.addEventListener('load', initializePitfall);
+    </script>
+</body>
+</html>
