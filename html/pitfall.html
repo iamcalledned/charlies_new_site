@@ -1,135 +1,198 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pitfall Adventure</title>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #000;
-            font-family: 'Press Start 2P', cursive;
-        }
-
-        #pitfallCanvas {
-            border: 2px solid #ddd;
-            background-color: #000;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Pitfall Clone</title>
+  <style>
+    /* Center the canvas, black border like Atari TV */
+    body {
+      margin: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      background: #68c8f9; /* sky blue */
+      border: 6px solid #000;
+      image-rendering: pixelated; /* crisp retro look */
+    }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #fff;
+      font: bold 20px monospace;
+      text-shadow: 1px 1px 0 #000;
+    }
+  </style>
 </head>
 <body>
-    <canvas id="pitfallCanvas" width="800" height="600"></canvas>
-    <script>
-        const canvas = document.getElementById('pitfallCanvas');
-        const ctx = canvas.getContext('2d');
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+  <div id="ui">Score: 0</div>
 
-        let player, obstacles, treasures, score, gameRunning, animationFrameId;
+  <script>
+    // ==== CONFIG & STATE ====
+    const canvas = document.getElementById('gameCanvas');
+    const ctx    = canvas.getContext('2d');
+    const ui     = document.getElementById('ui');
+    const W      = canvas.width;
+    const H      = canvas.height;
+    const groundY     = H - 50;
+    const scrollSpeed = 3;
 
-        function initializePitfall() {
-            player = { x: 50, y: canvas.height - 70, width: 30, height: 50, color: '#00FF00', speed: 5, jumping: false, velocityY: 0 };
-            obstacles = [{ x: 300, y: canvas.height - 50, width: 50, height: 50, color: '#8B4513' }];
-            treasures = [{ x: 600, y: canvas.height - 50, width: 30, height: 30, color: '#FFD700' }];
-            score = 0;
-            gameRunning = true;
-            gameLoop();
+    let player = { x:100, y:0, w:40, h:50, vy:0, onGround:false };
+    let holes      = [];
+    let treasures  = [];
+    let keys       = {};
+    let score      = 0;
+    let gameOver   = false;
+
+    // ==== INITIALIZATION ====
+    function init() {
+      player.y        = groundY - player.h;
+      player.vy       = 0;
+      holes           = [];
+      treasures       = [];
+      score           = 0;
+      gameOver        = false;
+      ui.textContent  = 'Score: 0';
+
+      // Pre-spawn a few holes ahead of the screen
+      let x = W;
+      for (let i = 0; i < 3; i++) {
+        x += rnd(300, 500);
+        let w = rnd(80, 150);
+        holes.push({ x, width: w });
+        if (Math.random() < 0.3) {
+          // 30% chance of a treasure above each new hole
+          treasures.push({ x: x + w / 2, y: groundY - 60, size: 20 });
         }
+      }
+    }
 
-        function drawPitfall() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function rnd(min, max) {
+      return min + Math.random() * (max - min);
+    }
 
-            // Draw player
-            ctx.fillStyle = player.color;
-            ctx.fillRect(player.x, player.y, player.width, player.height);
+    // ==== INPUT HANDLING ====
+    document.addEventListener('keydown', e => {
+      keys[e.code] = true;
+      if (gameOver && e.code === 'KeyR') init();
+    });
+    document.addEventListener('keyup', e => {
+      keys[e.code] = false;
+    });
 
-            // Draw obstacles
-            for (let obstacle of obstacles) {
-                ctx.fillStyle = obstacle.color;
-                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
-            }
+    // ==== GAME LOOP ====
+    function update() {
+      if (gameOver) return;
 
-            // Draw treasures
-            for (let treasure of treasures) {
-                ctx.fillStyle = treasure.color;
-                ctx.fillRect(treasure.x, treasure.y, treasure.width, treasure.height);
-            }
+      // Jump
+      if ((keys['Space'] || keys['ArrowUp']) && player.onGround) {
+        player.vy = -12;
+        player.onGround = false;
+      }
 
-            // Draw score
-            ctx.font = '1rem "Press Start 2P", cursive';
-            ctx.fillStyle = '#fff';
-            ctx.fillText(`Score: ${score}`, 10, 30);
+      // Gravity
+      player.vy += 0.5;
+      player.y  += player.vy;
+      if (player.y >= groundY - player.h) {
+        player.y = groundY - player.h;
+        player.vy = 0;
+        player.onGround = true;
+      }
+
+      // Scroll level
+      holes.forEach(h => h.x -= scrollSpeed);
+      treasures.forEach(t => t.x -= scrollSpeed);
+
+      // Recycle holes
+      if (holes.length && holes[0].x + holes[0].width < 0) {
+        holes.shift();
+        let last = holes[holes.length - 1];
+        let x    = last.x + rnd(300, 500);
+        let w    = rnd(80, 150);
+        holes.push({ x, width: w });
+        if (Math.random() < 0.3) {
+          treasures.push({ x: x + w / 2, y: groundY - 60, size: 20 });
         }
+      }
 
-        function updatePitfall() {
-            // Gravity
-            if (player.jumping) {
-                player.velocityY += 0.5;
-                player.y += player.velocityY;
-                if (player.y >= canvas.height - player.height - 20) {
-                    player.jumping = false;
-                    player.y = canvas.height - player.height - 20;
-                }
-            }
+      // Clean up off-screen treasures
+      treasures = treasures.filter(t => t.x + t.size > 0);
 
-            // Move obstacles
-            for (let obstacle of obstacles) {
-                obstacle.x -= 3;
-                if (obstacle.x + obstacle.width < 0) {
-                    obstacle.x = canvas.width + Math.random() * 200;
-                }
-            }
-
-            // Check collisions
-            for (let obstacle of obstacles) {
-                if (checkCollision(player, obstacle)) {
-                    endGame();
-                }
-            }
-
-            // Collect treasures
-            for (let i = treasures.length - 1; i >= 0; i--) {
-                if (checkCollision(player, treasures[i])) {
-                    treasures.splice(i, 1);
-                    score += 10;
-                }
-            }
+      // Treasure collision
+      for (let i = treasures.length - 1; i >= 0; i--) {
+        let t = treasures[i];
+        if (
+          player.x < t.x + t.size &&
+          player.x + player.w > t.x &&
+          player.y < t.y + t.size &&
+          player.y + player.h > t.y
+        ) {
+          treasures.splice(i, 1);
+          score++;
+          ui.textContent = 'Score: ' + score;
         }
+      }
 
-        function checkCollision(obj1, obj2) {
-            return obj1.x < obj2.x + obj2.width &&
-                   obj1.x + obj1.width > obj2.x &&
-                   obj1.y < obj2.y + obj2.height &&
-                   obj1.y + obj1.height > obj2.y;
-        }
-
-        function gameLoop() {
-            if (!gameRunning) return;
-            drawPitfall();
-            updatePitfall();
-            animationFrameId = requestAnimationFrame(gameLoop);
-        }
-
-        function endGame() {
-            gameRunning = false;
-            cancelAnimationFrame(animationFrameId);
-            alert('Game Over! Your score: ' + score);
-        }
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'ArrowUp' && !player.jumping) {
-                player.jumping = true;
-                player.velocityY = -10;
-            }
+      // Falling in a hole -> game over
+      if (player.onGround) {
+        let px = player.x + player.w / 2;
+        holes.forEach(h => {
+          if (px > h.x && px < h.x + h.width) {
+            gameOver = true;
+          }
         });
+      }
+    }
 
-        window.addEventListener('load', initializePitfall);
-    </script>
+    function draw() {
+      // Sky
+      ctx.fillStyle = '#68c8f9';
+      ctx.fillRect(0, 0, W, H);
+
+      // Ground
+      ctx.fillStyle = '#654321';
+      ctx.fillRect(0, groundY, W, 50);
+
+      // Holes (erase ground)
+      ctx.fillStyle = '#68c8f9';
+      holes.forEach(h => ctx.fillRect(h.x, groundY, h.width, 50));
+
+      // Treasures
+      ctx.fillStyle = 'gold';
+      treasures.forEach(t => ctx.fillRect(t.x, t.y, t.size, t.size));
+
+      // Player
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+
+      // Game Over overlay
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#fff';
+        ctx.font = '48px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Game Over', W / 2, H / 2 - 20);
+        ctx.font = '24px sans-serif';
+        ctx.fillText("Press 'R' to restart", W / 2, H / 2 + 20);
+      }
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // ==== START ====
+    init();
+    requestAnimationFrame(loop);
+  </script>
 </body>
 </html>
