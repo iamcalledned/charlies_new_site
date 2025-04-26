@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pitfall 2.0</title>
+  <title>Pitfall 2.1</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,7 +34,6 @@
   <canvas id="gameCanvas" width="800" height="400"></canvas>
   <div id="ui">Score: 0</div>
 
-  <!-- Swap in your own sound files here -->
   <audio id="jumpSound" src="assets/jump.mp3" preload="auto"></audio>
   <audio id="collectSound" src="assets/collect.mp3" preload="auto"></audio>
 
@@ -47,13 +46,18 @@
 
   const W = canvas.width, H = canvas.height;
   const groundY = H - 50;
-  const scrollSpeed = 3;
+
+  // TUNED PHYSICS
+  const scrollSpeed = 2.5;   // slower scroll
+  const gravity     = 0.6;   // gentler fall
+  const jumpVel     = -16;   // stronger jump
 
   let player = { x:100, y:0, w:40, h:50, vy:0, onGround:false, frame:0, frameDir:1 };
   let holes = [], treasures = [], particles = [], clouds = [];
   let keys = {}, score = 0, gameOver = false;
 
-  // ---- Setup ----
+  function rnd(min, max){ return min + Math.random()*(max-min); }
+
   function init() {
     player.y = groundY - player.h;
     player.vy = 0;
@@ -62,14 +66,15 @@
     holes = []; treasures = []; particles = []; clouds = [];
     score = 0; gameOver = false; ui.textContent = 'Score: 0';
 
-    // holes + treasures
+    // spawn holes & treasures
     let x = W;
     for (let i = 0; i < 4; i++) {
-      x += rnd(300, 500);
-      let w = rnd(80, 140);
+      x += rnd(300, 450);
+      let w = rnd(60, 110);                  // max hole width ≤ jump range
       holes.push({ x, w });
-      if (Math.random() < 0.4) treasures.push({ x: x + w/2, y: groundY - 60, size:24, angle:0 });
+      if (Math.random() < 0.4) treasures.push({ x: x+w/2, y: groundY-60, size:24, angle:0 });
     }
+
     // clouds
     for (let i = 0; i < 8; i++) {
       clouds.push({
@@ -81,29 +86,26 @@
     }
   }
 
-  function rnd(min, max){ return min + Math.random()*(max-min); }
-
-  // ---- Input ----
+  // input
   document.addEventListener('keydown', e => {
     keys[e.code] = true;
     if (gameOver && e.code==='KeyR') init();
   });
   document.addEventListener('keyup', e => { keys[e.code] = false; });
 
-  // ---- Game Loop ----
   function update() {
     if (gameOver) return;
 
     // jump
     if ((keys['Space']||keys['ArrowUp']) && player.onGround) {
-      player.vy = -14;
+      player.vy = jumpVel;
       player.onGround = false;
       jumpSound.currentTime = 0; jumpSound.play();
     }
 
-    // gravity & y
-    player.vy += 0.7;
-    player.y += player.vy;
+    // gravity & movement
+    player.vy += gravity;
+    player.y  += player.vy;
     if (player.y >= groundY - player.h) {
       player.y = groundY - player.h;
       player.vy = 0;
@@ -115,56 +117,55 @@
       player.frame += player.frameDir * 0.2;
       if (player.frame > 2 || player.frame < 0) player.frameDir *= -1;
     } else {
-      player.frame = 1; // mid-air pose
+      player.frame = 1;
     }
 
-    // scroll everything left
+    // scroll objects
     holes.forEach(h=>h.x-=scrollSpeed);
-    treasures.forEach(t=>{t.x-=scrollSpeed; t.angle+=0.05;});
-    clouds.forEach(c=>{ c.x -= c.speed; if (c.x < -c.size) c.x = W + c.size; });
-    particles.forEach(p=>{
-      p.x += p.vx; p.y += p.vy; p.alpha -= 0.02;
-    });
+    treasures.forEach(t=>{ t.x-=scrollSpeed; t.angle+=0.05; });
+    clouds.forEach(c=>{ c.x-=c.speed; if(c.x < -c.size) c.x = W + c.size; });
+    particles.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.alpha-=0.02; });
 
-    // recycle holes + spawn
+    // recycle holes
     if (holes[0] && holes[0].x + holes[0].w < 0) {
       holes.shift();
       let last = holes[holes.length-1];
-      let x = last.x + rnd(300,500), w = rnd(80,140);
-      holes.push({ x, w });
-      if (Math.random()<0.4) treasures.push({ x: x+w/2, y:groundY-60, size:24, angle:0 });
+      let xNew = last.x + rnd(300,450);
+      let wNew = rnd(60,110);
+      holes.push({ x:xNew, w:wNew });
+      if (Math.random()<0.4) treasures.push({ x:xNew + wNew/2, y:groundY-60, size:24, angle:0 });
     }
 
-    // clean off-screen treasures/particles
     treasures = treasures.filter(t=>t.x+t.size>0);
-    particles = particles.filter(p=>p.alpha>0);
+    particles  = particles.filter(p=>p.alpha>0);
 
-    // treasure collision
-    treasures.forEach((t,i)=>{
-      if (player.x < t.x+t.size && player.x+player.w > t.x &&
-          player.y < t.y+t.size && player.h+player.y > t.y) {
-        // collect
+    // collect treasures
+    for (let i = treasures.length-1; i >= 0; i--) {
+      let t = treasures[i];
+      if (
+        player.x < t.x+t.size &&
+        player.x+player.w > t.x &&
+        player.y < t.y+t.size &&
+        player.y+player.h > t.y
+      ) {
         collectSound.currentTime = 0; collectSound.play();
         spawnParticles(t.x+t.size/2, t.y+t.size/2);
         treasures.splice(i,1);
         score++; ui.textContent = 'Score: '+score;
       }
-    });
+    }
 
-    // hole collision (game over)
+    // check hole collision
     if (player.onGround) {
       let midX = player.x + player.w/2;
-      holes.forEach(h=> {
+      holes.forEach(h => {
         if (midX > h.x && midX < h.x + h.w) gameOver = true;
       });
     }
   }
 
   function draw() {
-    // clear
     ctx.clearRect(0,0,W,H);
-
-    // sky & ground handled by CSS gradient
 
     // clouds
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
@@ -174,11 +175,9 @@
       ctx.fill();
     });
 
-    // ground
+    // ground & holes
     ctx.fillStyle = '#432a10';
     ctx.fillRect(0, groundY, W, 50);
-
-    // holes (soft edge)
     holes.forEach(h=>{
       let grd = ctx.createRadialGradient(h.x+h.w/2, groundY+25, 10, h.x+h.w/2, groundY+25, 30);
       grd.addColorStop(0,'#432a10'); grd.addColorStop(1,'rgba(0,0,0,0)');
@@ -188,12 +187,11 @@
       ctx.fill();
     });
 
-    // treasures (rotating glow)
+    // treasures
     treasures.forEach(t=>{
       ctx.save();
       ctx.translate(t.x + t.size/2, t.y + t.size/2);
       ctx.rotate(t.angle);
-      // glow
       ctx.shadowColor = 'gold';
       ctx.shadowBlur = 20;
       ctx.fillStyle = '#ffea00';
@@ -206,21 +204,21 @@
     particles.forEach(p=>{
       ctx.globalAlpha = p.alpha;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0,Math.PI*2);
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
       ctx.fillStyle = p.color;
       ctx.fill();
     });
     ctx.globalAlpha = 1;
 
-    // player (circle with squash)
-    let pf = Math.sin(player.frame*Math.PI/2)*0.1 + 1;
+    // player (gentler squash)
+    let pf = Math.sin(player.frame*Math.PI/2)*0.05 + 1;
     let pw = player.w * pf, ph = player.h / pf;
     ctx.fillStyle = '#ff4500';
     ctx.beginPath();
     ctx.ellipse(player.x + player.w/2, player.y + player.h/2, pw/2, ph/2, 0,0,Math.PI*2);
     ctx.fill();
 
-    // game over overlay
+    // game over
     if (gameOver) {
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
       ctx.fillRect(0,0,W,H);
@@ -239,7 +237,6 @@
     requestAnimationFrame(loop);
   }
 
-  // spawn particles at (x,y)
   function spawnParticles(x,y) {
     for (let i=0; i<12; i++) {
       particles.push({
